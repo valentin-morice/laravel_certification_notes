@@ -160,3 +160,78 @@ public function terminate(Request $request, Response $response) {
 ```
 
 The instance of the middleware that will be called will be a fresh one, meaning without the data saved on the first instantiation. To use the same middleware for both method, register it as a singleton in the **AppServiceProvider** *register* method.
+
+## Controllers
+
+### Defining Controllers
+
+Use the `artisan make:controller` command to create a new controller. Controllers are accessed via the *web.php* routing file, by binding them to a route with a corresponding method, like so:
+```
+Route::get('/user/{id}', [UserController::class, 'show']);
+```
+
+### Single Action Controller
+
+If a controller action is complex, you can dedicate it to this action only. Define an *\_\_invoke()* method on the controller that will be called every time the controller is ran. You do not need to specify the method in your route file, only the controller's name. Generate an invokable controller using the `--invokable` option of the `make:controller` artisan commad.
+
+### Controller Middleware
+
+Middleware is usually assigned in the routes file:
+```
+Route::get('profile', [UserController::class, 'show'])->middleware('auth');
+```
+
+However, you can also use the *middleware* method in the constructor of your controller: 
+```
+```
+```
+public function __construct()
+    {
+        $this->middleware('auth');
+        $this->middleware('log')->only('index');
+        $this->middleware('subscribed')->except('store');
+    }
+```
+
+You can also register a middleware as a closure, that is, define an anonymous function inside the *middleware* method, to avoid creating an entire middleware class.
+
+### Resource Controller
+
+You can create controllers with all the CRUD associated (create, read, update, delete) methods using the `--resource` option of the `make:controller`. Create an associated resource route that points to the controller using the *resource* method on the *Route* object:
+```
+Route::resource('photos', PhotoController::class);
+```
+
+The *resource* method will automatically create multiple routes to handle all the actions defined in the controller (see in the documentation for a list of all routes). If the model automatically associated with the routes and controller isn't found, a 404 method will be returned. You can override this behavior by using the *missing* method on the resource route definition:
+```
+Route::resource('photos', PhotoController::class)
+        ->missing(function (Request $request) {
+            return Redirect::route('photos.index');
+        });
+```
+
+For *soft deleted models*, use the *withTrashed* method.
+
+The *resources* method on the *Route* object allows you to define several resource controllers all at once by specifying an array:
+```
+Route::resources([
+    'photos' => PhotoController::class,
+    'posts' => PostController::class,
+]);
+```
+
+If using route model binding, specify the model type-hinted using the `--model` option on the artisan `make:controller` command. Use the dotted notation to nest resources controllers.
+
+## Views
+
+### Create a View
+
+Create a view by placing a `blade.php` file inside the *resources/views* folder. Return a view from the route file, like so (the array is data passed on to the view):
+```
+Route::get('/', function () {
+    return view('greeting', ['name' => 'James']);
+});
+```
+
+
+
