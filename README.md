@@ -99,7 +99,7 @@ class Middleware
 	{
 		// Some code here...
 		
-		return \$next(\$request);
+		return $next($request);
 	}
 }
 ```
@@ -110,11 +110,11 @@ class Middleware
 {
 	public function handle(Request $request, Closure $next)
 	{
-		\$response =  \$next(\$request);
+		$response =  $next($request);
 		
 		// Some code here...
 		
-		return \$response;
+		return $response;
 	}
 }
 ```
@@ -172,7 +172,7 @@ Route::get('/user/{id}', [UserController::class, 'show']);
 
 ### Single Action Controller
 
-If a controller action is complex, you can dedicate it to this action only. Define an *\_\_invoke()* method on the controller that will be called every time the controller is ran. You do not need to specify the method in your route file, only the controller's name. Generate an invokable controller using the `--invokable` option of the `make:controller` artisan commad.
+If a controller action is complex, you can dedicate it to this action only. Define an *\_\_invoke()* method on the controller that will be called every time the controller is ran. You do not need to specify the method in your route file, only the controller's name. Generate an invokable controller using the `--invokable` flag of the `make:controller` artisan commad.
 
 ### Controller Middleware
 
@@ -182,8 +182,6 @@ Route::get('profile', [UserController::class, 'show'])->middleware('auth');
 ```
 
 However, you can also use the *middleware* method in the constructor of your controller: 
-```
-```
 ```
 public function __construct()
     {
@@ -197,7 +195,7 @@ You can also register a middleware as a closure, that is, define an anonymous fu
 
 ### Resource Controller
 
-You can create controllers with all the CRUD associated (create, read, update, delete) methods using the `--resource` option of the `make:controller`. Create an associated resource route that points to the controller using the *resource* method on the *Route* object:
+You can create controllers with all the CRUD associated (create, read, update, delete) methods using the `--resource` flag of the `make:controller` artisan command. Create an associated resource route that points to the controller using the *resource* method on the *Route* object:
 ```
 Route::resource('photos', PhotoController::class);
 ```
@@ -220,7 +218,7 @@ Route::resources([
 ]);
 ```
 
-If using route model binding, specify the model type-hinted using the `--model` option on the artisan `make:controller` command. Use the dotted notation to nest resources controllers.
+If using route model binding, specify the model type-hinted using the `--model` flag on the artisan `make:controller` command. Use the dotted notation to nest resources controllers.
 
 ## Views
 
@@ -233,5 +231,130 @@ Route::get('/', function () {
 });
 ```
 
+### Share Data with All Views
 
+Use the *View* object's *share* method to share data with all views. Place the calls to the *share* method inside a service provider's *boot* method.
 
+### View Composers
+
+View composers are callbacks or class methods called when a view is rendered. They are useful when a view is rendered by several routes or controllers and and needs specific data. View composers are usually registered inside a service provider.
+
+## Blade Templating
+
+### Displaying Data
+
+In blades, data is rendered like this: `Hello, {{ $name }}`. You do not have to only send variables to blades, you can pass any PHP statements to views: `The current UNIX timestamp is {{ time() }}`.
+If using a Javscript framwork, use the `@` symbol to inform the Blade engine that an expression should remain untouched.
+```
+Hello, @{{ name }}.
+```
+
+The `@` symbol will be removed by Blade, however, the `{{ name }}` symbol will remain untouched. Use the `@verbatim` directive to avoid using the `@` before each blade directive. You may send a PHP array to your view with the intention to use it as JS object. In order to do so, you can use the `Illuminate\Support\Js::from` method:
+```
+<script>
+    var app = {{ Illuminate\Support\Js::from($array) }};
+</script>
+```
+
+### Blade Directives
+
+Blade offers convenient shortcuts for common PHP statements, such as loops and conditionals. You may construct if statements using the `@if`, `@elseif`, `@else`, and `@endif` directives. They are working the same as their PHP counterparts:
+```
+@if (count($records) === 1)
+    I have one record!
+@endif
+```
+
+### Blade Components
+
+Components can either be class based or autonomous. To create a class based component, use the `artisan make:component` command. It will create a class file in the `app/View/Components` directory, and the view will be placed in the `resources/views/components` directory. Use the `--view` flag to create an anonymous component, that is, a view without a class.
+
+To display components, use the Blade component tag. Tags are starting with the string 'x-' followed by the kebab case name of the component class: `<x-user-profile/>`. If nested deeper inside the directory structure, use the dot notation: `<x-inputs.button/>`. If the components is to be rendered conditionally, define a 'shouldRender' method on the component class. If the method return false, the component will not render.
+
+#### Passing Data to the Component
+
+You may pass data to Blade components using HTML attributes. Like in Vue, simple strings are appended using vanilla attributes, and dynamic PHP values are prefixed with a ':' character:
+```
+<x-alert type="error" :message="$message"/>
+```
+
+You should define all of the components data attributes in the class constructor. Use the `camelCase` casing on the class, and the `kebab-case` casing for the HTML attributes. Additional dependencies should be declared in the constructor, before any of the component's properties. If you wish to prevent properties to be available to the view, add them to a protected '$except' array property on the component object. All properties and methods will be made available automatically to the view and do not need to be specified in the component's render method:
+```
+class Alert extends Component
+{
+    public function __construct(
+        public string $type,
+        public string $message,
+		public AlertCreator $creator,
+    ) {}
+ 
+    public function render(): View
+    {
+        return view('components.alert');
+    }
+}
+```
+
+Once the component is rendered, display the content of the variables by echoing the variables name:
+```
+<div class="alert alert-{{ $type }}">
+    {{ $message }}
+</div>
+```
+
+Since some JS frameworks use the same notation, you may write a double-colon '::' to inform Blade that the attribute is not a PHP expression: `<x-button ::class="{ danger: isDeleting }">` will render as `<x-button :class="{ danger: isDeleting }">`. You might want to add properties that are not defined in the component object, such as classes, inside the view. Those properties will be available as an `$attributes` variable inside the view, and can be accessed as such: 
+```
+<div {{ $attributes }}>
+    <!-- Component content -->
+</div>
+```
+
+The `$attributes` variable has a *merge* method, which is used to assign default values to HTML elements. The method accepts an array, where the key is the HTML attribute and the value is the HTML attribute's value.
+
+### Slots
+
+Slots allow you to pass additional data to your component. Echo the `$slot` variable inside your Blade view to render it:
+```
+<div class="alert alert-danger">
+    {{ $slot }}
+</div>
+```
+
+Content is passed through the slot by injecting content inside the component:
+```
+<x-alert>
+    <strong>Whoops!</strong> Something went wrong!
+</x-alert>
+```
+
+Slots can be named, in order to display them in specific places inside your views, by using the `<x-slot:example>` notation. The string after the  ':' character has to match the variable echoed in the component. You can assign additional attributes to the slots, such as classes or input types. For very small component, you may register the view directly by inlining it in the component's class *render* method, as such:
+```
+public function render(): string
+{
+    return <<<'blade'
+        <div class="alert alert-danger">
+            {{ $slot }}
+        </div>
+    blade;
+}
+```
+
+You may create a component that renders an inline view by using the `--inline` flag when executing the `make:component` command. For anonymous components, you can pass data using the `@props` directive at the top of you blade template.
+
+### Building Layouts
+
+Most websites use the same layout throughout various pages. You can define a `layout.blade.php` component inside your `resources/views/components` directory.
+
+## Session
+
+### Configuration
+
+Because HTTP driven application are stateless, sessions provide a way to persist data about the user across multiple requests. That information is typically placed in a persistent store/backend that can be accessed from subsequent requests. Laravel provide the following *drivers* for session storage:
+* _file_: sessions stored in `storage/framework/sessions`
+* _cookie_: sessions stored in encrypted cookies
+* _database_: sessions stored in a relational database
+* _memcached/redis_: sessions stored in a cache based store/database
+* _dynamodb_: sessions stored in AWS DynamoDB
+* _array_: sessions stored in a PHP array that will not be persisted
+
+Chose your driver in the configuration file stored at `config/session.php`. The array driver is primarily used for testing.
